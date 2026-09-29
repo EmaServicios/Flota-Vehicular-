@@ -1,0 +1,27 @@
+// Guarda la estructura de la app para que abra rápido. Los datos siempre se piden en vivo al servidor.
+const VERSION = 'flota-v1';
+const ARCHIVOS = ['./', 'index.html', 'config.js', 'manifest.webmanifest',
+  'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(ARCHIVOS); }).then(function () { return self.skipWaiting(); }));
+});
+
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys()
+    .then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== VERSION; }).map(function (k) { return caches.delete(k); })); })
+    .then(function () { return self.clients.claim(); }));
+});
+
+// Primero la red (siempre la versión más nueva); si no hay señal, la copia guardada.
+self.addEventListener('fetch', function (e) {
+  var req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  e.respondWith(fetch(req).then(function (res) {
+    var copia = res.clone();
+    caches.open(VERSION).then(function (c) { c.put(req, copia); });
+    return res;
+  }).catch(function () {
+    return caches.match(req).then(function (r) { return r || caches.match('index.html'); });
+  }));
+});

@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flota EMA Servicios</title>
+<meta name="theme-color" content="#282964">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Flota EMA">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f2f4f8;color:#1a1d24}
+    .top{background:#282964;color:#fff;padding:20px 20px 56px;border-bottom:4px solid #75C5E1}
+    .top small{opacity:.85;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    .top h1{margin:6px 0 0;font-size:22px}
+    .card{background:#fff;margin:-40px 16px 16px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden}
+    .patente{text-align:center;padding:18px;border-bottom:1px solid #eef0f4}
+    .patente span{display:inline-block;border:2px solid #1a1d24;border-radius:8px;padding:6px 16px;font-weight:700;font-size:22px;letter-spacing:.12em}
+    .fila{display:flex;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid #eef0f4}
+    .fila:last-child{border-bottom:0}
+    .fila b{color:#6b7280;font-weight:500}
+    .fila span{text-align:right;font-weight:600}
+    .dest{background:#f4f9fc}
+    .pie{text-align:center;color:#6b7280;font-size:13px;padding:8px 16px 28px;line-height:1.6}
+    .pie a{color:#282964}
+    form{padding:22px 20px}
+    label{display:block;font-size:14px;color:#6b7280;margin:0 0 6px}
+    input{width:100%;font-size:16px;padding:12px;border:1px solid #d0d5dd;border-radius:10px;margin:0 0 16px}
+    button{width:100%;font-size:16px;font-weight:600;padding:13px;border:0;border-radius:10px;background:#282964;color:#fff}
+    button:disabled{opacity:.6}
+    .msg{padding:18px 20px;color:#6b7280}.av{color:#b54708}.ve{color:#b42318}
+    .err{color:#b42318;font-size:14px;margin:-4px 0 14px;min-height:1em}
+    .sec{padding:10px 20px;background:#f7f8fa;color:#6b7280;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #eef0f4;border-top:1px solid #eef0f4}
+    .est{display:block;font-size:12px;font-weight:600;margin-top:3px}
+    .ok{color:#067647}.av{color:#b54708}.ve{color:#b42318}
+    .doc{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #eef0f4;text-decoration:none;color:inherit;font-weight:600}
+    .doc i{font-style:normal;font-size:20px}
+    .doc:after{content:'›';margin-left:auto;color:#9ca3af;font-size:22px}
+    .visor{background:#fff;margin:-40px 16px 16px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden;padding:8px}
+    .visor img,.visor canvas{display:block;width:100%;height:auto;margin:0 0 8px;border:1px solid #eef0f4}
+  
+    .top{position:relative}
+    .card,.visor{position:relative}
+    .atras{position:absolute;top:22px;right:20px;color:#fff;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 14px}
+    .busca{display:flex;gap:8px;padding:18px 20px}
+    .busca input{margin:0;text-transform:uppercase;letter-spacing:.08em}
+    .busca button{width:auto;padding:0 18px}
+    .res{display:block;padding:14px 20px;border-top:1px solid #eef0f4;text-decoration:none;color:inherit}
+    .res b{letter-spacing:.08em}
+    .res small{display:block;color:#6b7280;margin-top:2px}
+    .logo{display:inline-block;background:#fff;border-radius:12px;padding:8px 14px;margin-bottom:14px}
+    .logo img{display:block;height:44px;width:auto}
+    .elige{padding:22px 20px;text-align:center}
+    .elige p{margin:0 0 10px;color:#6b7280}
+    .elige .pat{display:inline-block;border:2px solid #1a1d24;border-radius:8px;padding:6px 16px;font-weight:700;font-size:22px;letter-spacing:.12em;margin-bottom:20px}
+    .elige button{margin-bottom:10px}
+    .sec2{background:#fff;color:#282964;border:2px solid #282964}
+    body.oscuro{background:#1b1c4b}
+    .oscuro .pie{color:#aeb0d6}
+    .oscuro .pie a{color:#75C5E1}
+    .fcard{position:relative;background:#fff;margin:-40px 16px 22px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.25);padding:22px 16px 16px;text-align:center}
+    .fpat{font-size:36px;letter-spacing:.06em;font-weight:500;line-height:1.1}
+    .fmod{margin-top:8px;font-weight:700;color:#4b5563;text-transform:uppercase;font-size:15px}
+    .fsub{margin-top:3px;color:#6b7280;text-transform:uppercase;font-size:13px;letter-spacing:.04em}
+    .fdat{display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid #eef0f4}
+    .fdat div{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.06em}
+    .fdat b{display:block;color:#1a1d24;font-size:14px;text-transform:none;letter-spacing:0;font-weight:600;margin-top:2px;word-break:break-word}
+    .cerrar{position:absolute;top:-18px;right:-6px;width:46px;height:46px;padding:0;border-radius:12px;background:#75C5E1;color:#282964;font-size:22px;line-height:46px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+    .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px 22px}
+    .tile{position:relative;width:auto;background:rgba(255,255,255,.12);border-radius:12px;color:#fff;padding:16px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+    .tile svg{width:30px;height:30px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    .tile small{font-weight:500;opacity:.7;text-transform:none;font-size:11px;letter-spacing:0}
+    .tile.vacio{opacity:.45}
+    .pt{position:absolute;top:8px;right:8px;width:11px;height:11px;border-radius:50%}
+    .pt.ve{background:#f04438}.pt.av{background:#f79009}.pt.ok{background:#12b76a}
+    .pill{display:block;width:auto;margin:0 auto 12px;padding:11px 24px;border-radius:999px;background:rgba(117,197,225,.16);border:1px solid #75C5E1;color:#fff;font-size:14px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+    .zmsg{color:#c9cbe8;font-size:13px;text-align:center;padding:0 24px 12px}
+    .zmsg a{color:#75C5E1}
+  
+    .top{padding-top:calc(20px + env(safe-area-inset-top, 0px))}
+    .atras{top:calc(22px + env(safe-area-inset-top, 0px))}
+    .inst{margin:0 16px 28px;text-align:center;font-size:13px;color:#6b7280;line-height:1.5}
+    .inst button{width:auto;padding:11px 20px}
+    body{-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+<div class="top"><a href="#" id="atras" class="atras" style="display:none">&#8592; Volver</a><div class="logo"><img src="icons/logo.png" alt="EMA Servicios"></div><h1 id="titulo">Flota</h1></div>
+<div id="app"><div class="card"><div class="msg">Cargando…</div></div></div>
+<div id="instalar" class="inst"></div>
+<script src="config.js"></script>
+<script>
+    // Conexión con el script de Google: imita google.script.run para reutilizar la interfaz sin cambios.
+    function llamarApi(fn, args) {
+      return fetch(CONFIG.API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // sin "preflight": Google no lo soporta
+        body: JSON.stringify({ fn: fn, args: args }),
+        redirect: 'follow'
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (r) {
+        if (r && r.__fallo) throw new Error('El servidor no pudo procesar el pedido');
+        return r;
+      });
+    }
+    window.google = { script: { run: (function mk(ok, fail) {
+      return new Proxy({}, { get: function (t, k) {
+        if (k === 'withSuccessHandler') return function (f) { return mk(f, fail); };
+        if (k === 'withFailureHandler') return function (f) { return mk(ok, f); };
+        return function () {
+          llamarApi(k, Array.prototype.slice.call(arguments))
+            .then(function (r) { if (ok) ok(r); })
+            .catch(function (e) { if (fail) fail(e); });
+        };
+      }});
+    })(null, null) } };
+
+    // Botón "Instalar app"
+    var promptInstalar = null, mostrarInst = false;
+    function esStandalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+    function esIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); promptInstalar = e; actualizarInstalar(); });
+    window.addEventListener('appinstalled', function () { promptInstalar = null; actualizarInstalar(); });
+    function actualizarInstalar() {
+      var el = document.getElementById('instalar');
+      if (!el) return;
+      if (esStandalone() || !mostrarInst) { el.innerHTML = ''; return; }
+      if (promptInstalar) {
+        el.innerHTML = '<button id="binst" class="sec2">&#128242; Instalar app en este celular</button>';
+        document.getElementById('binst').onclick = function () {
+          promptInstalar.prompt();
+          promptInstalar.userChoice.then(function () { promptInstalar = null; actualizarInstalar(); });
+        };
+      } else if (esIOS()) {
+        el.innerHTML = 'Para instalarla en iPhone: tocá <b>Compartir</b> y después <b>Agregar a inicio</b>.';
+      } else { el.innerHTML = ''; }
+    }
+    if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js'); });
+</script>
+<script>
+    var ID = (new URLSearchParams(location.search).get('id') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var KEY = 'flota_sesion';
+    var app = document.getElementById('app');
+    var titulo = document.getElementById('titulo');
+    var atrasEl = document.getElementById('atras');
+    var token = null, usuario = '', ultimaBusqueda = '', fichaActual = null, catActual = null;
+    try { token = localStorage.getItem(KEY); } catch (e) {}
+
+    var ICONOS = {
+      cedulas: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.5-2 2-3 3.5-3s3 1 3.5 3"/><path d="M15 9h3M15 13h3"/>',
+      seguros: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/>',
+      ruta: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+      titulos: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+      vtv: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+      contrato: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+      hidrogruas: '<path d="M4 21h10"/><path d="M8 21V9"/><path d="M8 9l10-5"/><path d="M18 4v8"/><circle cx="18" cy="14" r="2"/>',
+      credenciales: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8.5 17c.6-1.8 2-2.5 3.5-2.5s2.9.7 3.5 2.5"/><path d="M10 5.5h4"/>',
+      mantenimientos: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+      otros: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+    };
+    function icono(k) { return '<svg viewBox="0 0 24 24">' + (ICONOS[k] || ICONOS.otros) + '</svg>'; }
+
+    function guardar(t) {
+      token = t;
+      try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) {}
+    }
+    function h(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+    function pantalla(oscuro, volver) {
+      document.body.className = oscuro ? 'oscuro' : '';
+      mostrarInst = !oscuro; actualizarInstalar();
+      atrasEl.style.display = volver ? 'block' : 'none';
+      atrasEl.onclick = function (ev) { ev.preventDefault(); if (volver) volver(); };
+      window.scrollTo(0, 0);
+    }
+    function cargando() { app.innerHTML = '<div class="card"><div class="msg">Cargando…</div></div>'; }
+    function errorConexion() {
+      app.innerHTML = '<div class="card"><div class="msg">No se pudo conectar. Revisá la señal y recargá la página.</div></div>';
+    }
+    function pie() {
+      return '<div class="pie">' + (usuario ? 'Ingresaste como ' + h(usuario) + '<br>' : '') + '<a href="#" id="salir">Cerrar sesión</a></div>';
+    }
+    function activarPie() {
+      document.getElementById('salir').onclick = function (ev) {
+        ev.preventDefault();
+        var t = token; guardar(null); mostrarLogin('');
+        google.script.run.cerrarSesion(t);
+      };
+    }
+    function sinSesion(r) { if (r && r.auth === false) { guardar(null); mostrarLogin(''); return true; } return false; }
+
+    function inicio() {
+      if (!token) return mostrarLogin('');
+      if (ID) mostrarEleccion(); else mostrarBuscador('', null);
+    }
+
+    function mostrarEleccion() {
+      pantalla(false, null);
+      titulo.textContent = '¿Qué querés hacer?';
+      app.innerHTML = '<div class="card"><div class="elige">' +
+        '<p>Escaneaste el QR de la patente</p><div class="pat">' + h(ID) + '</div>' +
+        '<button id="ver">Ver esta patente</button>' +
+        '<button id="bus" class="sec2">&#128269; Buscar otra patente</button>' +
+        '</div></div>';
+      document.getElementById('ver').onclick = function () { verFicha(ID); };
+      document.getElementById('bus').onclick = function () { mostrarBuscador('', null); };
+    }
+
+    function verFicha(pat) {
+      cargando();
+      google.script.run.withFailureHandler(errorConexion).withSuccessHandler(mostrarFicha).verFicha(token, pat);
+    }
+
+    function mostrarFicha(r) {
+      if (sinSesion(r)) return;
+      fichaActual = r; catActual = null; usuario = r.usuario;
+      pantalla(true, null);
+      titulo.textContent = 'Vehículo';
+      var irBuscar = function (ev) { ev.preventDefault(); mostrarBuscador(ultimaBusqueda, null); };
+      if (r.noEncontrado) {
+        app.innerHTML = '<div class="card"><div class="msg">No hay datos para la patente <b>' + h(r.patente) + '</b>.</div>' +
+          '<div style="padding:0 20px 20px"><button id="otra">&#128269; Buscar otra patente</button></div></div>' + pie();
+        document.getElementById('otra').onclick = irBuscar;
+        activarPie();
+        return;
+      }
+      var tiles = '', mant = null;
+      r.cats.forEach(function (c) {
+        if (c.pill) { mant = c; return; }
+        if (!c.mostrar) return;
+        var sub = c.n > 0 ? c.n + (c.n === 1 ? ' archivo' : ' archivos') : (c.tieneDatos ? 'Ver datos' : 'Sin cargar');
+        tiles += '<button class="tile' + (c.vacio ? ' vacio' : '') + '" data-k="' + c.key + '">' +
+          (c.badge ? '<span class="pt ' + c.badge + '"></span>' : '') + icono(c.key) +
+          '<span>' + h(c.label) + '</span><small>' + sub + '</small></button>';
+      });
+      var datos = r.datos.map(function (d) { return '<div>' + h(d.l) + '<b>' + (h(d.v) || '&mdash;') + '</b></div>'; }).join('');
+      app.innerHTML =
+        '<div class="fcard"><button class="cerrar" id="x" aria-label="Cerrar">&#10005;</button>' +
+        '<div class="fpat">' + h(r.patente) + '</div><div class="fmod">' + h(r.modelo) + '</div>' +
+        '<div class="fsub">' + h(r.marca) + (r.anio ? ' &middot; ' + h(r.anio) : '') + '</div>' +
+        '<div class="fdat">' + datos + '</div></div>' +
+        '<div class="tiles">' + tiles + '</div>' +
+        (r.descarga && r.nDocs > 0 ? '<button class="pill" id="zip">Descargar documentación</button><div class="zmsg" id="zmsg"></div>' : '') +
+        (mant ? '<button class="pill" id="mant">Mantenimientos</button>' : '') +
+        (r.actualizado ? '<div class="pie">Actualizado: ' + h(r.actualizado) + '</div>' : '') + pie();
+      document.getElementById('x').onclick = irBuscar;
+      Array.prototype.forEach.call(document.querySelectorAll('.tile'), function (el) {
+        el.onclick = function () { mostrarCategoria(el.getAttribute('data-k')); };
+      });
+      if (mant) document.getElementById('mant').onclick = function () { mostrarCategoria('mantenimientos'); };
+      var zb = document.getElementById('zip');
+      if (zb) zb.onclick = bajarZip;
+      activarPie();
+    }
+
+    function mostrarCategoria(key) {
+      var c = null;
+      fichaActual.cats.forEach(function (x) { if (x.key === key) c = x; });
+      if (!c) return;
+      catActual = key;
+      pantalla(true, function () { mostrarFicha(fichaActual); });
+      titulo.textContent = c.label;
+      app.innerHTML = '<div class="card">' +
+        (c.html || '<div class="msg">Todavía no hay información ni documentos cargados.</div>') + '</div>' + pie();
+      Array.prototype.forEach.call(document.querySelectorAll('.doc'), function (el) {
+        el.onclick = function (ev) { ev.preventDefault(); abrirDoc(fichaActual.patente, el.getAttribute('data-id'), el.getAttribute('data-n')); };
+      });
+      activarPie();
+    }
+
+    function abrirDoc(pat, id, nombre) {
+      pantalla(true, function () { if (catActual) mostrarCategoria(catActual); else mostrarFicha(fichaActual); });
+      titulo.textContent = nombre;
+      app.innerHTML = '<div class="visor"><div id="acc"></div><div id="vis"><div class="msg">Abriendo documento…</div></div></div>';
+      google.script.run.withFailureHandler(errorConexion).withSuccessHandler(function (d) {
+        if (sinSesion(d)) return;
+        var vis = document.getElementById('vis');
+        if (d.error) { vis.innerHTML = '<div class="msg">' + h(d.error) + '</div>'; return; }
+        if (d.descarga) {
+          var acc = document.getElementById('acc');
+          acc.innerHTML = '<button id="dl" class="sec2" style="margin-bottom:6px">&#11015; Descargar</button>' +
+            '<div id="dlmsg" class="msg" style="padding:0 0 10px;font-size:13px"></div>';
+          document.getElementById('dl').onclick = function () { descargar(d, pat); };
+        }
+        if (d.tipo === 'img') { vis.innerHTML = '<img alt="">'; vis.firstChild.src = 'data:' + d.mime + ';base64,' + d.data; return; }
+        mostrarPdf(vis, d.data);
+      }).verDocumento(token, pat, id);
+    }
+
+    function bajar(b64, mime, archivo, msg) {
+      try {
+        var raw = atob(b64), bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        var url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+        var a = document.createElement('a');
+        a.href = url; a.download = archivo;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        msg.innerHTML = 'Si no empezó la descarga, <a href="' + url + '" target="_blank" rel="noopener">tocá acá para abrirlo</a> y guardalo desde ahí.';
+        return true;
+      } catch (e) {
+        msg.textContent = 'No se pudo descargar. Probá de nuevo o abrí la página en Chrome.';
+        return false;
+      }
+    }
+
+    function descargar(d, pat) {
+      var ext = d.tipo === 'pdf' ? '.pdf' : (/png/.test(d.mime) ? '.png' : '.jpg');
+      var nombre = (pat + ' - ' + d.nombre).replace(/[\\/:*?"<>|]/g, '') + ext;
+      if (bajar(d.data, d.mime, nombre, document.getElementById('dlmsg'))) {
+        google.script.run.registrarDescarga(token, pat, d.nombre);
+      }
+    }
+
+    function bajarZip() {
+      var bt = document.getElementById('zip'), msg = document.getElementById('zmsg');
+      var fin = function () { bt.disabled = false; bt.textContent = 'Descargar documentación'; };
+      bt.disabled = true; bt.textContent = 'Preparando…'; msg.textContent = '';
+      google.script.run.withFailureHandler(function () { fin(); msg.textContent = 'No se pudo conectar. Probá de nuevo.'; })
+        .withSuccessHandler(function (d) {
+          fin();
+          if (sinSesion(d)) return;
+          if (d.error) { msg.textContent = d.error; return; }
+          bajar(d.data, d.mime, d.nombre, msg);
+        }).descargarTodo(token, fichaActual.patente);
+    }
+
+    function cargarPdfJs(listo) {
+      if (window.pdfjsLib) return listo();
+      var sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      sc.onload = function () {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        listo();
+      };
+      sc.onerror = function () { listo(new Error('pdf.js')); };
+      document.head.appendChild(sc);
+    }
+
+    function mostrarPdf(vis, b64) {
+      cargarPdfJs(function (err) {
+        if (err) { vis.innerHTML = '<div class="msg">No se pudo cargar el visor de PDF. Revisá la conexión.</div>'; return; }
+        var raw = atob(b64), bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        pdfjsLib.getDocument({ data: bytes }).promise.then(function (pdf) {
+          vis.innerHTML = '';
+          var ancho = vis.clientWidth || 360, cadena = Promise.resolve();
+          for (var n = 1; n <= pdf.numPages; n++) {
+            (function (num) {
+              var cv = document.createElement('canvas'); vis.appendChild(cv);
+              cadena = cadena.then(function () {
+                return pdf.getPage(num).then(function (pg) {
+                  var base = pg.getViewport({ scale: 1 });
+                  var vp = pg.getViewport({ scale: Math.min(3, (ancho * 2) / base.width) });
+                  cv.width = vp.width; cv.height = vp.height;
+                  return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+                });
+              });
+            })(n);
+          }
+        }).catch(function () { vis.innerHTML = '<div class="msg">No se pudo abrir el PDF.</div>'; });
+      });
+    }
+
+    function mostrarBuscador(q, r) {
+      pantalla(false, null);
+      titulo.textContent = 'Buscar vehículo';
+      var lista = '';
+      if (r && r.error) lista = '<div class="msg">' + h(r.error) + '</div>';
+      else if (r && r.resultados) {
+        lista = r.resultados.length
+          ? r.resultados.map(function (x) {
+              return '<a href="#" class="res" data-p="' + h(x.patente) + '"><b>' + h(x.patente) + '</b><small>' +
+                h(x.vehiculo) + (x.chofer ? ' · ' + h(x.chofer) : '') + '</small></a>';
+            }).join('')
+          : '<div class="msg">No hay vehículos con esa patente.</div>';
+      }
+      app.innerHTML = '<div class="card"><form class="busca" id="fb">' +
+        '<input id="q" placeholder="Patente, ej. AH706HV" autocomplete="off" autocapitalize="characters">' +
+        '<button>Buscar</button></form>' + lista + '</div>' + pie();
+      var inp = document.getElementById('q');
+      inp.value = q || '';
+      if (!r) inp.focus();
+      document.getElementById('fb').onsubmit = function (ev) {
+        ev.preventDefault();
+        var texto = inp.value; ultimaBusqueda = texto;
+        cargando();
+        google.script.run.withFailureHandler(errorConexion).withSuccessHandler(function (res) {
+          if (sinSesion(res)) return;
+          if (res.usuario) usuario = res.usuario;
+          if (res.unica) return mostrarFicha(res);
+          mostrarBuscador(texto, res);
+        }).buscar(token, texto);
+      };
+      Array.prototype.forEach.call(document.querySelectorAll('.res'), function (el) {
+        el.onclick = function (ev) { ev.preventDefault(); verFicha(el.getAttribute('data-p')); };
+      });
+      activarPie();
+    }
+
+    function mostrarLogin(msg) {
+      pantalla(false, null);
+      titulo.textContent = 'Acceso restringido';
+      app.innerHTML =
+        '<div class="card"><form id="f">' +
+        '<label for="em">Mail</label><input id="em" type="email" autocomplete="username" required>' +
+        '<label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="current-password" required>' +
+        '<div class="err" id="er"></div><button id="bt">Ingresar</button></form></div>' +
+        '<div class="pie">Solo para personal de EMA Servicios.</div>';
+      document.getElementById('er').textContent = msg;
+      document.getElementById('f').onsubmit = function (ev) {
+        ev.preventDefault();
+        var bt = document.getElementById('bt');
+        bt.disabled = true; bt.textContent = 'Verificando…';
+        google.script.run.withFailureHandler(errorConexion).withSuccessHandler(function (r) {
+          if (r.error) {
+            bt.disabled = false; bt.textContent = 'Ingresar';
+            document.getElementById('er').textContent = r.error;
+            return;
+          }
+          guardar(r.token); inicio();
+        }).login(document.getElementById('em').value, document.getElementById('pw').value);
+      };
+    }
+    inicio();
+  </script>
+</body>
+</html>
