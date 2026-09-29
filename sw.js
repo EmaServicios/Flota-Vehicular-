@@ -1,7 +1,7 @@
 // Guarda la estructura de la app para que abra rápido. Los datos siempre se piden en vivo al servidor.
-const VERSION = 'flota-v1';
+const VERSION = 'flota-v2';
 const ARCHIVOS = ['./', 'index.html', 'config.js', 'manifest.webmanifest',
-  'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  'logo.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(ARCHIVOS); }).then(function () { return self.skipWaiting(); }));

@@ -1,6 +1,6 @@
 App Flota EMA Servicios
 =======================
-Subir TODO el contenido de esta carpeta (index.html, config.js, manifest.webmanifest, sw.js y la carpeta icons)
-a un sitio web gratuito (por ejemplo GitHub Pages). No cambia nada mas.
+Subir TODOS estos archivos (son 10, todos sueltos, sin carpetas) a GitHub: Add file > Upload files.
+Si GitHub pregunta por archivos que ya existen, se reemplazan.
 
 Si algun dia cambia la direccion del script de Google, editar solo la linea API de config.js.
