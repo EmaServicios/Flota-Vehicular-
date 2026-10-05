@@ -87,6 +87,14 @@
     .inst{margin:0 16px 28px;text-align:center;font-size:13px;color:#6b7280;line-height:1.5}
     .inst button{width:auto;padding:11px 20px}
     body{-webkit-tap-highlight-color:transparent}
+    .carga{padding:30px 20px;text-align:center;color:#6b7280}
+    .spin{width:34px;height:34px;border:4px solid #e3e6ee;border-top-color:#282964;border-radius:50%;animation:giro .9s linear infinite;margin:0 auto 14px}
+    @keyframes giro{to{transform:rotate(360deg)}}
+    .lento{font-size:12px;margin-top:8px;min-height:1em}
+    .sinred{display:none;position:absolute;top:0;left:0;right:0;background:#b54708;color:#fff;text-align:center;font-size:12px;padding:3px 0}
+    .offb{margin:-8px 16px 16px;background:rgba(245,158,11,.16);border:1px solid #f59e0b;color:#fde68a;border-radius:10px;padding:8px 12px;font-size:13px;text-align:center}
+    .pill.ok{border-color:#12b76a;background:rgba(18,183,106,.18)}
+
 
     @media (min-width: 700px) {
       .top { padding-left: calc(50% - 244px); padding-right: calc(50% - 244px); }
@@ -96,22 +104,27 @@
 </style>
 </head>
 <body>
-<div class="top"><a href="#" id="atras" class="atras" style="display:none">&#8592; Volver</a><div class="logo"><img src="logo.png" alt="EMA Servicios"></div><h1 id="titulo">Flota</h1></div>
+<div class="top"><div id="sinred" class="sinred">Sin conexión</div><a href="#" id="atras" class="atras" style="display:none">&#8592; Volver</a><div class="logo"><img src="logo.png" alt="EMA Servicios"></div><h1 id="titulo">Flota</h1></div>
 <div id="app"><div class="card"><div class="msg">Cargando…</div></div></div>
 <div id="instalar" class="inst"></div>
 <script src="config.js"></script>
 <script>
     // Conexión con el script de Google: imita google.script.run para reutilizar la interfaz sin cambios.
     function llamarApi(fn, args) {
+      var limite = (fn === 'verDocumento' || fn === 'descargarTodo') ? 90000 : 25000;
+      var ctl = window.AbortController ? new AbortController() : null;
+      var t = ctl ? setTimeout(function () { ctl.abort(); }, limite) : null;
       return fetch(CONFIG.API, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // sin "preflight": Google no lo soporta
         body: JSON.stringify({ fn: fn, args: args }),
-        redirect: 'follow'
+        redirect: 'follow',
+        signal: ctl ? ctl.signal : undefined
       }).then(function (r) {
+        clearTimeout(t);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
-      }).then(function (r) {
+      }, function (e) { clearTimeout(t); throw e; }).then(function (r) {
         if (r && r.__fallo) throw new Error('El servidor no pudo procesar el pedido');
         return r;
       });
@@ -166,6 +179,7 @@
       titulos: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
       vtv: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
       pagos: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+      transito: '<path d="M12 2v20"/><path d="M9 22h6"/><path d="M12 4h6.5L21 6.5 18.5 9H12z"/><path d="M12 12H5.5L3 14.5 5.5 17H12z"/>',
       contrato: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
       hidrogruas: '<path d="M4 21h10"/><path d="M8 21V9"/><path d="M8 9l10-5"/><path d="M18 4v8"/><circle cx="18" cy="14" r="2"/>',
       credenciales: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8.5 17c.6-1.8 2-2.5 3.5-2.5s2.9.7 3.5 2.5"/><path d="M10 5.5h4"/>',
@@ -174,10 +188,124 @@
     };
     function icono(k) { return '<svg viewBox="0 0 24 24">' + (ICONOS[k] || ICONOS.otros) + '</svg>'; }
 
+    /* ---- Copia local (IndexedDB): fichas y documentos para usar sin señal ---- */
+    var DIAS_LOCAL = 30, MAX_DOCS = 80;    // las copias se borran a los 30 días; se guardan hasta 80 documentos
+    var dbProm = null, seqCarga = 0;
+    function abrirDB() {
+      if (dbProm) return dbProm;
+      dbProm = new Promise(function (ok, no) {
+        if (!window.indexedDB) return no(new Error('sin IndexedDB'));
+        var rq = indexedDB.open('flota-local', 1);
+        rq.onupgradeneeded = function () {
+          var db = rq.result;
+          db.createObjectStore('fichas', { keyPath: 'pat' });
+          db.createObjectStore('docs', { keyPath: 'key' }).createIndex('guardado', 'guardado');
+        };
+        rq.onsuccess = function () { ok(rq.result); };
+        rq.onerror = function () { no(rq.error); };
+      });
+      return dbProm;
+    }
+    function idb(store, modo, fn) {
+      return abrirDB().then(function (db) {
+        return new Promise(function (ok, no) {
+          var tx = db.transaction(store, modo), req = fn(tx.objectStore(store));
+          tx.oncomplete = function () { ok(req ? req.result : undefined); };
+          tx.onerror = tx.onabort = function () { no(tx.error); };
+        });
+      });
+    }
+    function guardarFicha(r) {
+      return idb('fichas', 'readwrite', function (s) { return s.put({ pat: r.patente, ficha: r, guardado: Date.now() }); }).catch(function () {});
+    }
+    function leerFicha(pat) { return idb('fichas', 'readonly', function (s) { return s.get(pat); }).catch(function () { return null; }); }
+    function listarFichas() { return idb('fichas', 'readonly', function (s) { return s.getAll(); }).then(function (a) { return a || []; }).catch(function () { return []; }); }
+    function guardarDoc(rec) {
+      rec.guardado = Date.now();
+      return idb('docs', 'readwrite', function (s) { return s.put(rec); }).then(limitarDocs).catch(function () {});
+    }
+    function leerDoc(key) {
+      if (!key) return Promise.resolve(null);
+      return idb('docs', 'readonly', function (s) { return s.get(key); }).then(function (r) { return r || null; }).catch(function () { return null; });
+    }
+    function limitarDocs() {
+      return abrirDB().then(function (db) {
+        return new Promise(function (ok) {
+          var tx = db.transaction('docs', 'readwrite'), s = tx.objectStore('docs');
+          s.count().onsuccess = function (e) {
+            var sobran = e.target.result - MAX_DOCS;
+            if (sobran <= 0) return;
+            s.index('guardado').openKeyCursor().onsuccess = function (ev) {
+              var c = ev.target.result;
+              if (c && sobran-- > 0) { s.delete(c.primaryKey); c.continue(); }
+            };
+          };
+          tx.oncomplete = tx.onerror = tx.onabort = function () { ok(); };
+        });
+      }).catch(function () {});
+    }
+    function limpiarViejos() {
+      var tope = Date.now() - DIAS_LOCAL * 864e5;
+      return abrirDB().then(function (db) {
+        return new Promise(function (ok) {
+          var tx = db.transaction(['fichas', 'docs'], 'readwrite');
+          ['fichas', 'docs'].forEach(function (nom) {
+            tx.objectStore(nom).openCursor().onsuccess = function (ev) {
+              var c = ev.target.result;
+              if (!c) return;
+              if (c.value.guardado < tope) c.delete();
+              c.continue();
+            };
+          });
+          tx.oncomplete = tx.onerror = tx.onabort = function () { ok(); };
+        });
+      }).catch(function () {});
+    }
+    function borrarLocal() {
+      return abrirDB().then(function (db) {
+        return new Promise(function (ok) {
+          var tx = db.transaction(['fichas', 'docs'], 'readwrite');
+          tx.objectStore('fichas').clear(); tx.objectStore('docs').clear();
+          tx.oncomplete = tx.onerror = tx.onabort = function () { ok(); };
+        });
+      }).catch(function () {});
+    }
+    function claveDoc(d) { return d && d.mod ? d.id + '|' + d.mod : null; }
+    function contarGuardados(docs) {
+      return abrirDB().then(function (db) {
+        return new Promise(function (ok) {
+          var tx = db.transaction('docs', 'readonly'), s = tx.objectStore('docs'), n = 0;
+          docs.forEach(function (d) { var k = claveDoc(d); if (k) s.count(k).onsuccess = function (e) { n += e.target.result; }; });
+          tx.oncomplete = function () { ok(n); };
+          tx.onerror = tx.onabort = function () { ok(0); };
+        });
+      }).catch(function () { return 0; });
+    }
+    function fechaHora(ms) {
+      var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; };
+      return p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function cargaHtml(texto) {
+      return '<div class="carga"><div class="spin"></div><div>' + h(texto) + '</div><div class="lento" id="lento"></div></div>';
+    }
+    function avisoLento() {
+      var s = ++seqCarga;
+      setTimeout(function () {
+        var e = document.getElementById('lento');
+        if (s === seqCarga && e) e.textContent = 'Sigue cargando… si hay poca señal puede demorar.';
+      }, 6000);
+    }
+    function actualizarRed() {
+      var e = document.getElementById('sinred');
+      if (e) e.style.display = navigator.onLine === false ? 'block' : 'none';
+    }
+
     function guardar(t) {
       token = t;
       try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) {}
+      if (!t) borrarLocal();      // al cerrar sesión se borran las copias guardadas en el celular
     }
+
     function h(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
     function pantalla(oscuro, volver) {
       document.body.className = oscuro ? 'oscuro' : '';
@@ -186,10 +314,15 @@
       atrasEl.onclick = function (ev) { ev.preventDefault(); if (volver) volver(); };
       window.scrollTo(0, 0);
     }
-    function cargando() { app.innerHTML = '<div class="card"><div class="msg">Cargando…</div></div>'; }
-    function errorConexion() {
-      app.innerHTML = '<div class="card"><div class="msg">No se pudo conectar. Revisá la señal y recargá la página.</div></div>';
+    function cargando(texto) {
+      app.innerHTML = '<div class="card">' + cargaHtml(texto || 'Cargando…') + '</div>';
+      avisoLento();
     }
+
+    function errorConexion(msg) {
+      app.innerHTML = '<div class="card"><div class="msg">' + h(typeof msg === 'string' ? msg : 'No se pudo conectar. Revisá la señal y probá de nuevo.') + '</div></div>';
+    }
+
     function pie() {
       return '<div class="pie">' + (usuario ? 'Ingresaste como ' + h(usuario) + '<br>' : '') + '<a href="#" id="salir">Cerrar sesión</a></div>';
     }
@@ -203,6 +336,11 @@
     function sinSesion(r) { if (r && r.auth === false) { guardar(null); mostrarLogin(''); return true; } return false; }
 
     function inicio() {
+      limpiarViejos();
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+      actualizarRed();
+      window.addEventListener('online', actualizarRed);
+      window.addEventListener('offline', actualizarRed);
       if (!token) return mostrarLogin('');
       if (ID) mostrarEleccion(); else mostrarBuscador('', null);
     }
@@ -220,13 +358,21 @@
     }
 
     function verFicha(pat) {
-      cargando();
-      google.script.run.withFailureHandler(errorConexion).withSuccessHandler(mostrarFicha).verFicha(token, pat);
+      cargando('Buscando la unidad…');
+      google.script.run.withFailureHandler(function () {
+        // sin conexión: si la unidad está guardada en el celular, se muestra esa copia
+        leerFicha(pat).then(function (rec) {
+          if (rec) mostrarFicha(rec.ficha, rec.guardado);
+          else errorConexion('No se pudo conectar y esta unidad no está guardada en el celular.');
+        });
+      }).withSuccessHandler(function (r) { mostrarFicha(r); }).verFicha(token, pat);
     }
 
-    function mostrarFicha(r) {
-      if (sinSesion(r)) return;
-      fichaActual = r; catActual = null; usuario = r.usuario;
+    function mostrarFicha(r, offGuardado) {
+      if (!offGuardado && sinSesion(r)) return;
+      var off = !!offGuardado;
+      r.__off = offGuardado || 0;
+      fichaActual = r; catActual = null; usuario = r.usuario || usuario;
       pantalla(true, null);
       titulo.textContent = 'Vehículo';
       var irBuscar = function (ev) { ev.preventDefault(); mostrarBuscador(ultimaBusqueda, null); };
@@ -237,6 +383,7 @@
         activarPie();
         return;
       }
+      if (!off) guardarFicha(r);
       var tiles = '', mant = null;
       r.cats.forEach(function (c) {
         if (c.pill) { mant = c; return; }
@@ -247,13 +394,17 @@
           '<span>' + h(c.label) + '</span><small>' + sub + '</small></button>';
       });
       var datos = r.datos.map(function (d) { return '<div>' + h(d.l) + '<b>' + (h(d.v) || '&mdash;') + '</b></div>'; }).join('');
+      var puedeGuardar = !off && r.docs && r.docs.length && r.docs.every(function (d) { return d.mod; });
       app.innerHTML =
         '<div class="fcard"><button class="cerrar" id="x" aria-label="Cerrar">&#10005;</button>' +
         '<div class="fpat">' + h(r.patente) + '</div><div class="fmod">' + h(r.modelo) + '</div>' +
         '<div class="fsub">' + h(r.marca) + (r.anio ? ' &middot; ' + h(r.anio) : '') + '</div>' +
         '<div class="fdat">' + datos + '</div></div>' +
+        (off ? '<div class="offb">Sin conexión · datos guardados el ' + h(fechaHora(offGuardado)) + '</div>' : '') +
+        (r.sinCarpeta ? '<div class="offb">Esta unidad todavía no tiene carpeta de documentos vinculada en Drive. Avisá al administrador de flota.</div>' : '') +
         '<div class="tiles">' + tiles + '</div>' +
-        (r.descarga && r.nDocs > 0 ? '<button class="pill" id="zip">Descargar documentación</button><div class="zmsg" id="zmsg"></div>' : '') +
+        (!off && r.descarga && r.nDocs > 0 ? '<button class="pill" id="zip">Descargar documentación</button><div class="zmsg" id="zmsg"></div>' : '') +
+        (puedeGuardar ? '<button class="pill" id="guardar">Guardar para usar sin señal</button><div class="zmsg" id="offmsg"></div>' : '') +
         (mant ? '<button class="pill" id="mant">Mantenimientos</button>' : '') +
         (r.actualizado ? '<div class="pie">Actualizado: ' + h(r.actualizado) + '</div>' : '') + pie();
       document.getElementById('x').onclick = irBuscar;
@@ -263,6 +414,7 @@
       if (mant) document.getElementById('mant').onclick = function () { mostrarCategoria('mantenimientos'); };
       var zb = document.getElementById('zip');
       if (zb) zb.onclick = bajarZip;
+      if (puedeGuardar) { document.getElementById('guardar').onclick = guardarSinSenal; actualizarPillGuardar(); }
       activarPie();
     }
 
@@ -271,33 +423,116 @@
       fichaActual.cats.forEach(function (x) { if (x.key === key) c = x; });
       if (!c) return;
       catActual = key;
-      pantalla(true, function () { mostrarFicha(fichaActual); });
+      pantalla(true, function () { mostrarFicha(fichaActual, fichaActual.__off); });
       titulo.textContent = c.label;
       app.innerHTML = '<div class="card">' +
         (c.html || '<div class="msg">Todavía no hay información ni documentos cargados.</div>') + '</div>' + pie();
       Array.prototype.forEach.call(document.querySelectorAll('.doc'), function (el) {
-        el.onclick = function (ev) { ev.preventDefault(); abrirDoc(fichaActual.patente, el.getAttribute('data-id'), el.getAttribute('data-n')); };
+        el.onclick = function (ev) {
+          ev.preventDefault();
+          abrirDoc(fichaActual.patente, el.getAttribute('data-id'), el.getAttribute('data-n'), el.getAttribute('data-m'));
+        };
       });
       activarPie();
     }
 
-    function abrirDoc(pat, id, nombre) {
-      pantalla(true, function () { if (catActual) mostrarCategoria(catActual); else mostrarFicha(fichaActual); });
+    function abrirDoc(pat, id, nombre, mod) {
+      pantalla(true, function () { if (catActual) mostrarCategoria(catActual); else mostrarFicha(fichaActual, fichaActual.__off); });
       titulo.textContent = nombre;
-      app.innerHTML = '<div class="visor"><div id="acc"></div><div id="vis"><div class="msg">Abriendo documento…</div></div></div>';
-      google.script.run.withFailureHandler(errorConexion).withSuccessHandler(function (d) {
-        if (sinSesion(d)) return;
+      app.innerHTML = '<div class="visor"><div id="acc"></div><div id="vis">' + cargaHtml('Abriendo documento…') + '</div></div>';
+      avisoLento();
+      var key = Number(mod) ? id + '|' + mod : null;
+      leerDoc(key).then(function (rec) {
+        if (rec) return mostrarDocumento(rec, pat);          // copia guardada en el celular: se abre al instante
         var vis = document.getElementById('vis');
-        if (d.error) { vis.innerHTML = '<div class="msg">' + h(d.error) + '</div>'; return; }
-        if (d.descarga) {
-          var acc = document.getElementById('acc');
-          acc.innerHTML = '<button id="dl" class="sec2" style="margin-bottom:6px">&#11015; Descargar</button>' +
-            '<div id="dlmsg" class="msg" style="padding:0 0 10px;font-size:13px"></div>';
-          document.getElementById('dl').onclick = function () { descargar(d, pat); };
+        if (!vis) return;
+        if (navigator.onLine === false) {
+          vis.innerHTML = '<div class="msg">Este documento no está guardado en el celular. Abrilo una vez con señal para poder verlo sin conexión.</div>';
+          return;
         }
-        if (d.tipo === 'img') { vis.innerHTML = '<img alt="">'; vis.firstChild.src = 'data:' + d.mime + ';base64,' + d.data; return; }
-        mostrarPdf(vis, d.data);
-      }).verDocumento(token, pat, id);
+        google.script.run.withFailureHandler(function () {
+          var v = document.getElementById('vis');
+          if (v) v.innerHTML = '<div class="msg">No se pudo conectar. Si lo necesitás sin señal, abrilo antes con conexión: queda guardado en el celular.</div>';
+        }).withSuccessHandler(function (d) {
+          if (sinSesion(d)) return;
+          var v = document.getElementById('vis');
+          if (!v) return;
+          if (d.error) { v.innerHTML = '<div class="msg">' + h(d.error) + '</div>'; return; }
+          var nuevo = { key: key, id: id, pat: pat, nombre: d.nombre, tipo: d.tipo, mime: d.mime, data: d.data };
+          if (key) guardarDoc(nuevo);
+          mostrarDocumento(nuevo, pat, d.descarga);
+        }).verDocumento(token, pat, id);
+      });
+    }
+
+    function mostrarDocumento(rec, pat, permiso) {
+      var vis = document.getElementById('vis');
+      if (!vis) return;
+      var puede = typeof permiso === 'boolean' ? permiso : !!(fichaActual && fichaActual.descarga);
+      if (puede && navigator.onLine !== false) {
+        var acc = document.getElementById('acc');
+        acc.innerHTML = '<button id="dl" class="sec2" style="margin-bottom:6px">&#11015; Descargar</button>' +
+          '<div id="dlmsg" class="msg" style="padding:0 0 10px;font-size:13px"></div>';
+        document.getElementById('dl').onclick = function () { descargar(rec, pat); };
+      }
+      if (rec.tipo === 'img') { vis.innerHTML = '<img alt="">'; vis.firstChild.src = 'data:' + rec.mime + ';base64,' + rec.data; return; }
+      mostrarPdf(vis, rec.data);
+    }
+
+    function actualizarPillGuardar() {
+      var bt = document.getElementById('guardar');
+      if (!bt || !fichaActual.docs) return;
+      contarGuardados(fichaActual.docs).then(function (n) {
+        var b = document.getElementById('guardar');
+        if (!b) return;
+        b.disabled = false;
+        if (n >= fichaActual.docs.length) { b.textContent = '\u2713 Guardado en este celular'; b.classList.add('ok'); }
+        else { b.textContent = 'Guardar para usar sin señal (' + fichaActual.docs.length + ')'; b.classList.remove('ok'); }
+      });
+    }
+
+    function guardarSinSenal() {
+      var r = fichaActual, docs = r.docs || [], bt = document.getElementById('guardar'), msg = document.getElementById('offmsg');
+      var hechos = 0, fallos = 0, i = 0;
+      bt.disabled = true; msg.textContent = '';
+      function paso() {
+        if (i >= docs.length) {
+          actualizarPillGuardar();
+          var m = document.getElementById('offmsg');
+          if (m) m.textContent = fallos ? 'Se guardaron ' + hechos + ' de ' + docs.length + '. Alguno no se pudo guardar: probá de nuevo con mejor señal.'
+            : 'Listo: ' + hechos + (hechos === 1 ? ' documento guardado' : ' documentos guardados') + ' en este celular.';
+          return;
+        }
+        var d = docs[i++], key = claveDoc(d);
+        bt.textContent = 'Guardando ' + i + ' de ' + docs.length + '…';
+        leerDoc(key).then(function (rec) {
+          if (rec) { hechos++; return paso(); }
+          google.script.run.withFailureHandler(function () { fallos++; paso(); }).withSuccessHandler(function (res) {
+            if (sinSesion(res)) return;
+            if (!res || !res.data) { fallos++; return paso(); }
+            guardarDoc({ key: key, id: d.id, pat: r.patente, nombre: res.nombre, tipo: res.tipo, mime: res.mime, data: res.data })
+              .then(function () { hechos++; paso(); });
+          }).verDocumento(token, r.patente, d.id);
+        });
+      }
+      paso();
+    }
+
+    function mostrarGuardadas() {
+      pantalla(false, function () { mostrarBuscador(ultimaBusqueda, null); });
+      titulo.textContent = 'Guardadas en el celular';
+      listarFichas().then(function (a) {
+        a.sort(function (x, y) { return x.pat < y.pat ? -1 : 1; });
+        app.innerHTML = '<div class="card">' + (a.length ? a.map(function (x) {
+          var f = x.ficha || {};
+          return '<a href="#" class="res" data-p="' + h(x.pat) + '"><b>' + h(x.pat) + '</b><small>' + h(((f.marca || '') + ' ' + (f.modelo || '')).trim()) +
+            ' · guardada el ' + h(fechaHora(x.guardado)) + '</small></a>';
+        }).join('') : '<div class="msg">Todavía no hay unidades guardadas. Se guardan solas cada vez que abrís una ficha con señal.</div>') + '</div>' + pie();
+        Array.prototype.forEach.call(document.querySelectorAll('.res'), function (el) {
+          el.onclick = function (ev) { ev.preventDefault(); verFicha(el.getAttribute('data-p')); };
+        });
+        activarPie();
+      });
     }
 
     function bajar(b64, mime, archivo, msg) {
@@ -340,11 +575,8 @@
     function cargarPdfJs(listo) {
       if (window.pdfjsLib) return listo();
       var sc = document.createElement('script');
-      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-      sc.onload = function () {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        listo();
-      };
+      sc.src = 'pdf.min.js';      // el visor de PDF está dentro de la app, así funciona sin conexión
+      sc.onload = function () { pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js'; listo(); };
       sc.onerror = function () { listo(new Error('pdf.js')); };
       document.head.appendChild(sc);
     }
@@ -389,15 +621,17 @@
       }
       app.innerHTML = '<div class="card"><form class="busca" id="fb">' +
         '<input id="q" placeholder="Patente, ej. AH706HV" autocomplete="off" autocapitalize="characters">' +
-        '<button>Buscar</button></form>' + lista + '</div>' + pie();
+        '<button>Buscar</button></form>' + lista + '<div id="guardadas"></div></div>' + pie();
       var inp = document.getElementById('q');
       inp.value = q || '';
       if (!r) inp.focus();
       document.getElementById('fb').onsubmit = function (ev) {
         ev.preventDefault();
         var texto = inp.value; ultimaBusqueda = texto;
-        cargando();
-        google.script.run.withFailureHandler(errorConexion).withSuccessHandler(function (res) {
+        cargando('Buscando…');
+        google.script.run.withFailureHandler(function () {
+          mostrarBuscador(texto, { error: 'No se pudo conectar. Si la unidad está guardada en el celular, la encontrás abajo.' });
+        }).withSuccessHandler(function (res) {
           if (sinSesion(res)) return;
           if (res.usuario) usuario = res.usuario;
           if (res.unica) return mostrarFicha(res);
@@ -406,6 +640,12 @@
       };
       Array.prototype.forEach.call(document.querySelectorAll('.res'), function (el) {
         el.onclick = function (ev) { ev.preventDefault(); verFicha(el.getAttribute('data-p')); };
+      });
+      listarFichas().then(function (a) {
+        var el = document.getElementById('guardadas');
+        if (!el || !a.length) return;
+        el.innerHTML = '<a href="#" class="res" id="vg">&#128241; Unidades guardadas en este celular (' + a.length + ')</a>';
+        document.getElementById('vg').onclick = function (ev) { ev.preventDefault(); mostrarGuardadas(); };
       });
       activarPie();
     }

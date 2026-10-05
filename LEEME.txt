@@ -1,6 +1,6 @@
-App Flota EMA Servicios
-=======================
-Subir TODOS estos archivos (son 10, todos sueltos, sin carpetas) a GitHub: Add file > Upload files.
-Si GitHub pregunta por archivos que ya existen, se reemplazan.
-
-Si algun dia cambia la direccion del script de Google, editar solo la linea API de config.js.
+Actualizacion de la app Flota EMA
+=================================
+Subir estos 5 archivos a GitHub (Add file > Upload files), todos sueltos y en la misma carpeta que los demas.
+GitHub reemplaza index.html y sw.js, y agrega los otros tres. No hace falta tocar nada mas.
+(pdf.min.js y pdf.worker.min.js son el visor de PDF, ahora dentro de la app para que funcione sin senal.
+ pdfjs-LICENSE.txt es la licencia de ese visor.)
